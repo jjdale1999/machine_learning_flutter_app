@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:tflite/tflite.dart';
+import 'package:geolocator/geolocator.dart';
+
 
 void main() => runApp(MaterialApp(
   home: MyApp(),
@@ -16,10 +18,15 @@ class _MyAppState extends State<MyApp> {
   List _outputs;
   File _image;
   bool _loading = false;
+  final Geolocator geolocator = Geolocator()..forceAndroidLocationManager;
+  Position _currentPosition;
+  String _currentAddress;
 
   @override
   void initState() {
     super.initState();
+    _getCurrentLocation();
+
     _loading = true;
 
     loadModel().then((value) {
@@ -27,6 +34,36 @@ class _MyAppState extends State<MyApp> {
         _loading = false;
       });
     });
+  }
+
+  _getCurrentLocation() {
+    geolocator
+        .getCurrentPosition(desiredAccuracy: LocationAccuracy.best)
+        .then((Position position) {
+      setState(() {
+        _currentPosition = position;
+      });
+
+      _getAddressFromLatLng();
+    }).catchError((e) {
+      print(e);
+    });
+  }
+
+  _getAddressFromLatLng() async {
+    try {
+      List<Placemark> p = await geolocator.placemarkFromCoordinates(
+          _currentPosition.latitude, _currentPosition.longitude);
+
+      Placemark place = p[0];
+
+      setState(() {
+        _currentAddress =
+        "${place.locality}, ${place.postalCode}, ${place.country}";
+      });
+    } catch (e) {
+      print(e);
+    }
   }
 
   @override
@@ -59,7 +96,34 @@ class _MyAppState extends State<MyApp> {
                 background: Paint()..color = Colors.white,
               ),
             )
-                : Container()
+                : Container(),
+            Row(
+              children: <Widget>[
+                Icon(Icons.location_on),
+                SizedBox(
+                  width: 8,
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'Location',
+                        style: Theme.of(context).textTheme.caption,
+                      ),
+                      if (_currentPosition != null &&
+                          _currentAddress != null)
+                        Text(_currentAddress,
+                            style:
+                            Theme.of(context).textTheme.bodyText2),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  width: 8,
+                ),
+              ],
+            ),
           ],
         ),
       ),
